@@ -19,7 +19,6 @@ def solve_belt_problem(graph_data, node_data):
     original_sources = set()
     sink_node = None
     
-    # --- Step 1: Handle Node Capacities (Node Splitting) ---
     for node_name, data in node_data.items():
         v_in = f"{node_name}_in"
         v_out = f"{node_name}_out"
@@ -39,7 +38,6 @@ def solve_belt_problem(graph_data, node_data):
             sink_node = node_name
             node_balance[v_in] -= data["demand"]
 
-    # --- Step 2: Handle Lower Bounds (Transformation) ---
     original_edges = []
     for edge in graph_data:
         u, v = edge["from"], edge["to"]
@@ -57,25 +55,17 @@ def solve_belt_problem(graph_data, node_data):
         node_balance[u_out] -= lo
         node_balance[v_in] += lo
 
-    # --- Step 3: Create Final Feasibility Graph ---
     total_demand_required = 0
     
     for node, balance in node_balance.items():
         
-        # --- THIS IS THE FIX ---
-        # The logic has been INVERTED to the correct algorithm.
-        
         if balance > 0:
-            # POSITIVE balance is a NET SUPPLY. Connect S_STAR TO it.
             G_transformed.add_edge(S_STAR, node, capacity=balance)
         elif balance < 0:
-            # NEGATIVE balance is a NET DEMAND. Connect it TO T_STAR.
             demand = -balance
             G_transformed.add_edge(node, T_STAR, capacity=demand)
             total_demand_required += demand
-        # --- END FIX ---
 
-    # --- Step 4: Solve and Check Feasibility ---
     try:
         flow_value, flow_dict = nx.maximum_flow(G_transformed, S_STAR, T_STAR)
     except nx.NetworkXUnbounded:
@@ -84,7 +74,6 @@ def solve_belt_problem(graph_data, node_data):
             "message": "Unbounded flow detected. Check for edges with infinite capacity."
         }
     
-    # --- Step 5: Format Output ---
     if abs(flow_value - total_demand_required) < TOLERANCE:
         return _format_success(
             flow_dict, original_edges, original_sources, node_data
@@ -94,8 +83,6 @@ def solve_belt_problem(graph_data, node_data):
             G_transformed, flow_dict, flow_value, total_demand_required,
             original_edges, node_data
         )
-
-# --- All helper functions remain the same ---
 
 def _format_success(flow_dict, original_edges, original_sources, node_data):
     final_flows = []
@@ -160,7 +147,7 @@ def _format_infeasible(
                 
                 flow = flow_dict.get(v_in, {}).get(v_out, 0)
                 if abs(flow - data["cap"]) < TOLERANCE:
-                     tight_nodes.append(node)
+                    tight_nodes.append(node)
                 
     for u, v, lo, hi in original_edges:
         u_out, v_in = f"{u}_out", f"{v}_in"
@@ -182,56 +169,43 @@ def _format_infeasible(
         }
     }
 
-# --- MAIN function remains the same ---
-
 if __name__ == "__main__":
     try:
-        # 1. Read all input from stdin
         input_data = json.load(sys.stdin)
 
-        # 2. Get the edge data (renamed from 'graph' to 'edges')
         graph_data = input_data.get("edges", [])
 
-        # 3. Build the node_data dictionary from the new format
         node_data = {}
         total_supply = 0
 
-        # 3a. Add sources and calculate total supply
         sources = input_data.get("sources", {})
         for name, data in sources.items():
             supply = data.get("supply", 0)
             node_data[name] = {"supply": supply}
             total_supply += supply
 
-        # 3b. Add regular nodes (map 'capacity' to 'cap')
         nodes = input_data.get("nodes", {})
         for name, data in nodes.items():
-            # Only add capacity if it's specified
             if "capacity" in data:
                 node_data[name] = {"cap": data["capacity"]}
             else:
                 node_data[name] = {}
 
-        # 3c. Add the sink (demand = total_supply)
         sink_info = input_data.get("sink", {})
         sink_name = sink_info.get("name")
         
         if not sink_name:
             raise ValueError("Input JSON missing 'sink' object with 'name'")
 
-        # Add sink to node_data, even if it was also in 'nodes'
         node_data[sink_name] = {"demand": total_supply}
 
-        # 4. Check for missing data
         if not graph_data:
             raise ValueError("Missing 'edges' data.")
         if not sources or not sink_name:
-             raise ValueError("Missing 'sources' or 'sink' data.")
+            raise ValueError("Missing 'sources' or 'sink' data.")
             
-        # 5. Call the solver function with the reconstructed data
         solution = solve_belt_problem(graph_data, node_data)
         
-        # 6. Print the resulting JSON to stdout
         json.dump(solution, sys.stdout, indent=2)
 
     except json.JSONDecodeError:

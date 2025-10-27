@@ -1,0 +1,7 @@
+Name: Saurav Patel
+Email: mt1221284@iitd.ac.in
+OS: Windows 11
+CPU: AMD Ryzon 5 5500U
+RAM: 8GB
+Language & version: Python 3.11.7
+Optional notes: Used 'scipy.optimize.linprog' for factory. Used Pytest, Pylance, Used 'networkx' for belts.
